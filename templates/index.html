@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting Transcriber</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .upload-section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .file-upload.dragover {
+            border-color: #764ba2;
+            background: #e8ecff;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 3em;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+
+        .upload-text {
+            font-size: 1.2em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .record-section {
+            margin-bottom: 40px;
+        }
+
+        .record-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .record-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .record-button.recording {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .record-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: white;
+        }
+
+        .record-icon.recording {
+            background: #ff6b6b;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .status.loading {
+            background: #e3f2fd;
+            color: #1976d2;
+            display: block;
+        }
+
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            display: block;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            display: block;
+        }
+
+        .transcript {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .transcript.show {
+            display: block;
+        }
+
+        .transcript-title {
+            font-size: 1.2em;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .transcript-text {
+            line-height: 1.6;
+            color: #555;
+            white-space: pre-wrap;
+        }
+
+        .transcript-meta {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .copy-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+        .copy-button:hover {
+            background: #5a6fd8;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Meeting Transcriber</h1>
+            <p>Upload audio files or record directly to get instant transcriptions</p>
+        </div>
+
+        <div class="content">
+            <!-- File Upload Section -->
+            <div class="upload-section">
+                <h2 class="section-title">📁 Upload Audio File</h2>
+                <div class="file-upload" id="fileUpload">
+                    <div class="upload-icon">📁</div>
+                    <div class="upload-text">Drop your audio file here or click to browse</div>
+                    <div class="upload-hint">Supports: MP3, WAV, M4A, FLAC, OGG, WEBM (max 100MB)</div>
+                    <input type="file" class="file-input" id="audioFile" accept="audio/*">
+                </div>
+            </div>
+
+            <!-- Record Section -->
+            <div class="record-section">
+                <h2 class="section-title">🎙️ Record Audio</h2>
+                <button class="record-button" id="recordButton">
+                    <div class="record-icon" id="recordIcon"></div>
+                    <span id="recordText">Start Recording</span>
+                </button>
+            </div>
+
+            <!-- Status Messages -->
+            <div class="status" id="status"></div>
+
+            <!-- Transcript Display -->
+            <div class="transcript" id="transcript">
+                <div class="transcript-title">📝 Transcription Result</div>
+                <div class="transcript-text" id="transcriptText"></div>
+                <div class="transcript-meta" id="transcriptMeta"></div>
+                <button class="copy-button" id="copyButton">Copy to Clipboard</button>
+            </div>
+        </div>
+
+        <div class="footer">
+            Powered by OpenAI Whisper API
+        </div>
+    </div>
+
+    <script>
+        // File upload handling
+        const fileUpload = document.getElementById('fileUpload');
+        const audioFile = document.getElementById('audioFile');
+        const recordButton = document.getElementById('recordButton');
+        const recordIcon = document.getElementById('recordIcon');
+        const recordText = document.getElementById('recordText');
+        const status = document.getElementById('status');
+        const transcript = document.getElementById('transcript');
+        const transcriptText = document.getElementById('transcriptText');
+        const transcriptMeta = document.getElementById('transcriptMeta');
+        const copyButton = document.getElementById('copyButton');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        // File upload functionality
+        fileUpload.addEventListener('click', () => audioFile.click());
+        fileUpload.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileUpload.classList.add('dragover');
+        });
+        fileUpload.addEventListener('dragleave', () => {
+            fileUpload.classList.remove('dragover');
+        });
+        fileUpload.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileUpload.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileUpload(files[0]);
+            }
+        });
+
+        audioFile.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileUpload(e.target.files[0]);
+            }
+        });
+
+        // Recording functionality
+        recordButton.addEventListener('click', () => {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        });
+
+        // Copy functionality
+        copyButton.addEventListener('click', () => {
+            navigator.clipboard.writeText(transcriptText.textContent).then(() => {
+                copyButton.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyButton.textContent = 'Copy to Clipboard';
+                }, 2000);
+            });
+        });
+
+        function handleFileUpload(file) {
+            if (!file.type.startsWith('audio/')) {
+                showStatus('Please select an audio file.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('audio_file', file);
+
+            showStatus('Uploading and transcribing audio...', 'loading');
+
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTranscript(data.transcript, data.duration, data.method);
+                    showStatus('Transcription completed successfully!', 'success');
+                } else {
+                    showStatus(data.error || 'Transcription failed.', 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('Error: ' + error.message, 'error');
+            });
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.addEventListener('dataavailable', event => {
+                    audioChunks.push(event.data);
+                });
+
+                mediaRecorder.addEventListener('stop', () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        sendRecordedAudio(reader.result);
+                    };
+                    reader.readAsDataURL(audioBlob);
+                });
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordButton.classList.add('recording');
+                recordIcon.classList.add('recording');
+                recordText.textContent = 'Stop Recording';
+                showStatus('Recording... Click to stop.', 'loading');
+            } catch (error) {
+                showStatus('Error accessing microphone: ' + error.message, 'error');
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                recordButton.classList.remove('recording');
+                recordIcon.classList.remove('recording');
+                recordText.textContent = 'Start Recording';
+                showStatus('Processing recording...', 'loading');
+            }
+        }
+
+        function sendRecordedAudio(audioData) {
+            fetch('/record', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ audio_data: audioData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showTranscript(data.transcript, data.duration, data.method);
+                    showStatus('Recording transcribed successfully!', 'success');
+                } else {
+                    showStatus(data.error || 'Transcription failed.', 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('Error: ' + error.message, 'error');
+            });
+        }
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        function showTranscript(text, duration, method) {
+            transcriptText.textContent = text;
+            
+            let metaText = `Method: ${method}`;
+            if (duration) {
+                metaText += ` | Duration: ${Math.round(duration)}s`;
+            }
+            transcriptMeta.textContent = metaText;
+            
+            transcript.classList.add('show');
+        }
+    </script>
+</body>
+</html>
