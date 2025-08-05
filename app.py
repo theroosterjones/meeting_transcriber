@@ -2,7 +2,7 @@ import os
 import tempfile
 import uuid
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
 import openai
@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import speech_recognition as sr
 import io
 import base64
+from functools import wraps
 
 # Load environment variables
 load_dotenv()
@@ -27,6 +28,19 @@ ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# Simple user credentials (in production, use a database and hashed passwords)
+USERS = {
+    os.getenv('ADMIN_USERNAME', 'admin'): os.getenv('ADMIN_PASSWORD', 'password123')
+}
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'logged_in' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -74,10 +88,34 @@ def transcribe_with_google(audio_file_path):
         return None
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        if username in USERS and USERS[username] == password:
+            session['logged_in'] = True
+            session['username'] = username
+            flash('Login successful!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash('You have been logged out', 'info')
+    return redirect(url_for('login'))
+
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     """Handle file upload and transcription"""
     if 'audio_file' not in request.files:
@@ -130,6 +168,7 @@ def upload_file():
         return jsonify({'error': f'Processing error: {str(e)}'}), 500
 
 @app.route('/record', methods=['POST'])
+@login_required
 def record_audio():
     """Handle recorded audio from browser"""
     try:
@@ -181,5 +220,11 @@ if __name__ == '__main__':
     if not os.getenv('OPENAI_API_KEY'):
         print("Warning: OPENAI_API_KEY not found in environment variables.")
         print("Please set your OpenAI API key in the .env file.")
+    
+    # Check if admin credentials are configured
+    if not os.getenv('ADMIN_USERNAME') or not os.getenv('ADMIN_PASSWORD'):
+        print("Warning: ADMIN_USERNAME or ADMIN_PASSWORD not found in environment variables.")
+        print("Using default credentials: admin/password123")
+        print("Please set ADMIN_USERNAME and ADMIN_PASSWORD in the .env file for security.")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

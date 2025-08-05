@@ -29,8 +29,9 @@ REM Create .env file if it doesn't exist
 if not exist .env (
     echo 🔑 Creating .env file...
     copy env_example.txt .env
-    echo ⚠️  IMPORTANT: Please edit .env file and add your OpenAI API key!
-    echo    Get your API key from: https://platform.openai.com/api-keys
+    echo ⚠️  IMPORTANT: Please edit .env file and add your credentials!
+    echo    Get your OpenAI API key from: https://platform.openai.com/api-keys
+    echo    Change ADMIN_USERNAME and ADMIN_PASSWORD for security!
 ) else (
     echo ✅ .env file already exists
 )

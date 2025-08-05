@@ -2,6 +2,10 @@
 # Get your API key from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 
+# Admin Login Credentials (CHANGE THESE FOR SECURITY!)
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=password123
+
 # Optional: Configure other settings
 # FLASK_ENV=development
 # FLASK_DEBUG=True

@@ -243,8 +243,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎤 Meeting Transcriber</h1>
-            <p>Upload audio files or record directly to get instant transcriptions</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>🎤 Meeting Transcriber</h1>
+                    <p>Upload audio files or record directly to get instant transcriptions</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('logout') }}" style="color: white; text-decoration: none; padding: 8px 16px; border: 1px solid white; border-radius: 5px; font-size: 14px;">Logout</a>
+                </div>
+            </div>
         </div>
 
         <div class="content">
