@@ -18,6 +18,25 @@ A web-based application that transcribes meeting audio using OpenAI's speech rec
 
 ## Installation
 
+### Quick Setup (Recommended)
+
+**On macOS/Linux:**
+```bash
+git clone <your-repository-url>
+cd Meeting_Transcriber
+chmod +x setup.sh
+./setup.sh
+```
+
+**On Windows:**
+```bash
+git clone <your-repository-url>
+cd Meeting_Transcriber
+setup.bat
+```
+
+### Manual Setup
+
 1. **Clone the repository**
    ```bash
    git clone <your-repository-url>
