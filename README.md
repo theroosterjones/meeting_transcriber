@@ -59,9 +59,11 @@ setup.bat
    cp env_example.txt .env
    ```
    
-   Edit `.env` file and add your OpenAI API key:
+   Edit `.env` file and add your credentials:
    ```
    OPENAI_API_KEY=your_actual_openai_api_key_here
+   ADMIN_USERNAME=your_username_here
+   ADMIN_PASSWORD=your_secure_password_here
    ```
 
 ## Usage
@@ -84,8 +86,12 @@ setup.bat
 The application uses environment variables for configuration. Copy `env_example.txt` to `.env` and modify as needed:
 
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
+- `ADMIN_USERNAME`: Your login username (required)
+- `ADMIN_PASSWORD`: Your login password (required)
 - `FLASK_ENV`: Set to 'development' for debug mode
 - `FLASK_DEBUG`: Enable/disable debug mode
+
+**Security Note**: No default credentials are provided. You must set your own username and password in the `.env` file.
 
 ## Dependencies
 

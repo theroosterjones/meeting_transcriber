@@ -4,7 +4,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 # Admin Login Credentials (CHANGE THESE FOR SECURITY!)
 ADMIN_USERNAME=admin
-ADMIN_PASSWORD=Trapezius12$
+ADMIN_PASSWORD=your_secure_password_here
 
 # Optional: Configure other settings
 # FLASK_ENV=development

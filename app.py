@@ -31,7 +31,7 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 # Simple user credentials (in production, use a database and hashed passwords)
 USERS = {
-    os.getenv('ADMIN_USERNAME', 'admin'): os.getenv('ADMIN_PASSWORD', 'Trapezius12$')
+    os.getenv('ADMIN_USERNAME', 'admin'): os.getenv('ADMIN_PASSWORD', 'your_secure_password_here')
 }
 
 def login_required(f):
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     # Check if admin credentials are configured
     if not os.getenv('ADMIN_USERNAME') or not os.getenv('ADMIN_PASSWORD'):
         print("Warning: ADMIN_USERNAME or ADMIN_PASSWORD not found in environment variables.")
-        print("Using default credentials: admin/Trapezius12$")
         print("Please set ADMIN_USERNAME and ADMIN_PASSWORD in the .env file for security.")
+        print("Default credentials will not work - you must configure your own.")
     
     app.run(debug=True, host='0.0.0.0', port=5000)
