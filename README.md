@@ -5,10 +5,14 @@ A web-based application that transcribes meeting audio using OpenAI's speech rec
 ## Features
 
 - **Real-time Audio Transcription**: Upload audio files or record directly in the browser
-- **OpenAI Integration**: Leverages OpenAI's advanced speech recognition capabilities
+- **Long Audio Support**: Automatic chunking for files over 25MB (supports 1+ hour recordings)
+- **AI-Powered Summaries**: Generate key points, executive summaries, and detailed summaries
+- **OpenAI Integration**: Leverages OpenAI's advanced speech recognition and GPT capabilities
 - **Web Interface**: Clean, user-friendly web interface for easy interaction
 - **Secure**: Environment-based configuration for API keys and sensitive data
 - **Cross-platform**: Works on Windows, macOS, and Linux
+- **File Size Handling**: Smart file size management with automatic chunking
+- **Multiple Summary Types**: Key points, executive summary, and detailed analysis
 
 ## Prerequisites
 
@@ -70,16 +74,38 @@ setup.bat
 
 1. **Start the application**
    ```bash
-   python app.py
+   python3 app.py
    ```
 
 2. **Open your browser**
-   Navigate to `http://localhost:5000`
+   Navigate to `http://localhost:5002`
 
 3. **Use the application**
-   - Upload an audio file, or
+   - Upload an audio file (supports files up to 500MB)
    - Record audio directly in the browser
    - Get transcribed text results
+   - Generate AI-powered summaries (Key Points, Executive, or Detailed)
+
+## Recent Updates (v2.0)
+
+### Major Improvements:
+- **Long Audio Support**: Now handles recordings over 1 hour by automatically splitting into manageable chunks
+- **AI Summaries**: Added three types of AI-generated summaries using GPT-3.5-turbo
+- **File Size Management**: Smart handling of large files with automatic chunking
+- **Better Error Handling**: Improved error messages and file size validation
+- **Enhanced UI**: Added summary generation buttons and improved user experience
+
+### Technical Changes:
+- **Automatic Chunking**: Files over 25MB are split into 10-minute chunks for processing
+- **Summary API**: New `/summarize` endpoint for generating different types of summaries
+- **GPT Integration**: Added GPT-3.5-turbo for summary generation
+- **Port Change**: Application now runs on port 5002 instead of 5000
+- **Python Command**: Updated to use `python3` instead of `python`
+
+### Summary Types Available:
+1. **Key Points**: Main topics, decisions, action items, and insights
+2. **Executive Summary**: High-level overview with strategic decisions and business impact
+3. **Detailed Summary**: Comprehensive coverage with timelines, assignees, and risks
 
 ## Configuration
 
@@ -98,10 +124,12 @@ The application uses environment variables for configuration. Copy `env_example.
 - **Flask**: Web framework
 - **SpeechRecognition**: Audio processing
 - **PyAudio**: Audio input/output
-- **OpenAI**: API integration for transcription
+- **OpenAI**: API integration for transcription and summarization
 - **python-dotenv**: Environment variable management
-- **pydub**: Audio file manipulation
+- **pydub**: Audio file manipulation and chunking
 - **numpy**: Numerical operations
+- **Werkzeug**: WSGI utilities
+- **requests**: HTTP library
 
 ## Project Structure
 

@@ -5,9 +5,14 @@ from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, flash, session
 from werkzeug.utils import secure_filename
 from pydub import AudioSegment
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
-import speech_recognition as sr
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
+    print("Warning: SpeechRecognition not available. Live recording will be disabled.")
 import io
 import base64
 from functools import wraps
@@ -17,14 +22,14 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max file size for long recordings
 
 # Configure OpenAI
-openai.api_key = os.getenv('OPENAI_API_KEY')
+client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Configure upload settings
 UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm'}
+ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm', 'opus'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
@@ -56,27 +61,62 @@ def convert_audio_to_wav(audio_file_path):
         print(f"Error converting audio: {e}")
         return audio_file_path
 
+def split_audio_into_chunks(audio_file_path, chunk_duration_minutes=10):
+    """Split audio file into smaller chunks for processing"""
+    try:
+        audio = AudioSegment.from_file(audio_file_path)
+        chunk_duration_ms = chunk_duration_minutes * 60 * 1000  # Convert to milliseconds
+        
+        chunks = []
+        for i in range(0, len(audio), chunk_duration_ms):
+            chunk = audio[i:i + chunk_duration_ms]
+            chunk_path = f"{audio_file_path.rsplit('.', 1)[0]}_chunk_{i//chunk_duration_ms}.wav"
+            chunk.export(chunk_path, format='wav')
+            chunks.append(chunk_path)
+        
+        return chunks
+    except Exception as e:
+        print(f"Error splitting audio: {e}")
+        return [audio_file_path]
+
 def transcribe_with_openai(audio_file_path):
     """Transcribe audio using OpenAI Whisper API"""
     try:
+        print(f"Starting transcription of: {audio_file_path}")
+        
+        # Check file size
+        file_size = os.path.getsize(audio_file_path)
+        print(f"File size: {file_size / (1024*1024):.2f} MB")
+        
+        # OpenAI Whisper API has a 25MB limit
+        if file_size > 25 * 1024 * 1024:  # 25MB
+            print(f"File too large ({file_size / (1024*1024):.2f} MB) for OpenAI API (25MB limit)")
+            return None
+        
         # Convert to WAV if needed
         wav_path = convert_audio_to_wav(audio_file_path)
+        print(f"Converted to WAV: {wav_path}")
         
         with open(wav_path, 'rb') as audio_file:
-            transcript = openai.Audio.transcribe(
+            print("Sending to OpenAI Whisper API...")
+            transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
-                response_format="verbose_json",
-                timestamp_granularities=["word"]
+                response_format="verbose_json"
             )
+            print("Received response from OpenAI")
         
         return transcript
     except Exception as e:
         print(f"Error transcribing with OpenAI: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 def transcribe_with_google(audio_file_path):
     """Fallback transcription using Google Speech Recognition"""
+    if not SPEECH_RECOGNITION_AVAILABLE:
+        return None
     try:
         recognizer = sr.Recognizer()
         with sr.AudioFile(audio_file_path) as source:
@@ -85,6 +125,115 @@ def transcribe_with_google(audio_file_path):
             return {"text": text, "method": "google"}
     except Exception as e:
         print(f"Error transcribing with Google: {e}")
+        return None
+
+def transcribe_long_audio(audio_file_path):
+    """Transcribe long audio by splitting into chunks"""
+    try:
+        file_size = os.path.getsize(audio_file_path)
+        file_size_mb = file_size / (1024*1024)
+        
+        # If file is under 25MB, process normally
+        if file_size_mb <= 25:
+            return transcribe_with_openai(audio_file_path)
+        
+        print(f"File is {file_size_mb:.1f} MB, splitting into chunks...")
+        
+        # Split into 10-minute chunks (approximately 15-20MB each)
+        chunks = split_audio_into_chunks(audio_file_path, chunk_duration_minutes=10)
+        
+        all_transcripts = []
+        for i, chunk_path in enumerate(chunks):
+            print(f"Processing chunk {i+1}/{len(chunks)}: {chunk_path}")
+            
+            # Transcribe chunk
+            chunk_transcript = transcribe_with_openai(chunk_path)
+            if chunk_transcript:
+                all_transcripts.append(chunk_transcript.text)
+            
+            # Clean up chunk file
+            if os.path.exists(chunk_path):
+                os.remove(chunk_path)
+        
+        if all_transcripts:
+            # Combine all transcripts
+            combined_text = " ".join(all_transcripts)
+            return type('obj', (object,), {
+                'text': combined_text,
+                'method': 'openai_chunked'
+            })()
+        else:
+            return None
+            
+    except Exception as e:
+        print(f"Error in long audio transcription: {e}")
+        return None
+
+def generate_summary(transcript_text, summary_type="key_points"):
+    """Generate summary of transcription using OpenAI GPT"""
+    try:
+        if summary_type == "key_points":
+            prompt = f"""Please analyze this meeting transcript and provide a concise summary with key points:
+
+{transcript_text}
+
+Please provide:
+1. Main topics discussed
+2. Key decisions made
+3. Action items and next steps
+4. Important insights or conclusions
+
+Format as a clear, structured summary."""
+        
+        elif summary_type == "executive":
+            prompt = f"""Please create an executive summary of this meeting transcript:
+
+{transcript_text}
+
+Provide a high-level overview including:
+- Meeting purpose and outcomes
+- Strategic decisions
+- Business impact
+- Recommendations
+
+Keep it concise and executive-friendly."""
+        
+        elif summary_type == "detailed":
+            prompt = f"""Please create a detailed summary of this meeting transcript:
+
+{transcript_text}
+
+Include:
+- Complete agenda coverage
+- All major discussion points
+- Decisions and rationale
+- Action items with assignees
+- Timeline and deadlines
+- Risks and concerns raised
+
+Provide a comprehensive but organized summary."""
+        
+        else:
+            prompt = f"""Please summarize this meeting transcript:
+
+{transcript_text}
+
+Provide a clear, concise summary of the main points discussed."""
+        
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a professional meeting summarizer. Create clear, actionable summaries."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1000,
+            temperature=0.3
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        print(f"Error generating summary: {e}")
         return None
 
 @app.route('/')
@@ -136,20 +285,17 @@ def upload_file():
         file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
         file.save(file_path)
         
-        # Transcribe with OpenAI
-        transcript = transcribe_with_openai(file_path)
+        # Transcribe with OpenAI (handles long files automatically)
+        transcript = transcribe_long_audio(file_path)
         
         if transcript:
             # Clean up temporary file
             os.remove(file_path)
-            if file_path.endswith('.wav') and file_path != audio_file_path:
-                os.remove(wav_path)
             
             return jsonify({
                 'success': True,
-                'transcript': transcript['text'],
-                'duration': transcript.get('duration'),
-                'method': 'openai'
+                'transcript': transcript.text,
+                'method': transcript.method
             })
         else:
             # Try Google as fallback
@@ -162,7 +308,8 @@ def upload_file():
                     'method': 'google'
                 })
             else:
-                return jsonify({'error': 'Transcription failed'}), 500
+                os.remove(file_path)
+                return jsonify({'error': 'Transcription failed. Please try again.'}), 500
                 
     except Exception as e:
         return jsonify({'error': f'Processing error: {str(e)}'}), 500
@@ -188,17 +335,16 @@ def record_audio():
         with open(file_path, 'wb') as f:
             f.write(audio_bytes)
         
-        # Transcribe
-        transcript = transcribe_with_openai(file_path)
+        # Transcribe (handles long files automatically)
+        transcript = transcribe_long_audio(file_path)
         
         if transcript:
             # Clean up
             os.remove(file_path)
             return jsonify({
                 'success': True,
-                'transcript': transcript['text'],
-                'duration': transcript.get('duration'),
-                'method': 'openai'
+                'transcript': transcript.text,
+                'method': transcript.method
             })
         else:
             return jsonify({'error': 'Transcription failed'}), 500
@@ -215,6 +361,33 @@ def health_check():
         'timestamp': datetime.now().isoformat()
     })
 
+@app.route('/summarize', methods=['POST'])
+@login_required
+def summarize_transcript():
+    """Generate summary of transcription"""
+    try:
+        data = request.get_json()
+        transcript_text = data.get('transcript')
+        summary_type = data.get('summary_type', 'key_points')
+        
+        if not transcript_text:
+            return jsonify({'error': 'No transcript provided'}), 400
+        
+        print(f"Generating {summary_type} summary...")
+        summary = generate_summary(transcript_text, summary_type)
+        
+        if summary:
+            return jsonify({
+                'success': True,
+                'summary': summary,
+                'summary_type': summary_type
+            })
+        else:
+            return jsonify({'error': 'Failed to generate summary'}), 500
+            
+    except Exception as e:
+        return jsonify({'error': f'Summary error: {str(e)}'}), 500
+
 if __name__ == '__main__':
     # Check if OpenAI API key is configured
     if not os.getenv('OPENAI_API_KEY'):
@@ -227,4 +400,4 @@ if __name__ == '__main__':
         print("Please set ADMIN_USERNAME and ADMIN_PASSWORD in the .env file for security.")
         print("Default credentials will not work - you must configure your own.")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5002)

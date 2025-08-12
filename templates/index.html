@@ -217,6 +217,28 @@
             background: #5a6fd8;
         }
 
+        .summary-button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .summary-button:hover {
+            background: #45a049;
+            transform: translateY(-1px);
+        }
+
+        .summary-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
         .footer {
             text-align: center;
             padding: 20px;
@@ -284,6 +306,21 @@
                 <div class="transcript-text" id="transcriptText"></div>
                 <div class="transcript-meta" id="transcriptMeta"></div>
                 <button class="copy-button" id="copyButton">Copy to Clipboard</button>
+                
+                <!-- Summary Section -->
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+                    <h3 style="margin-bottom: 15px; color: #333;">📋 Generate Summary</h3>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                        <button class="summary-button" onclick="generateSummary('key_points')">Key Points</button>
+                        <button class="summary-button" onclick="generateSummary('executive')">Executive Summary</button>
+                        <button class="summary-button" onclick="generateSummary('detailed')">Detailed Summary</button>
+                    </div>
+                    <div id="summaryResult" style="display: none;">
+                        <h4 style="margin-bottom: 10px; color: #333;">Summary Result</h4>
+                        <div id="summaryText" style="background: #f0f8ff; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50; white-space: pre-wrap; line-height: 1.6;"></div>
+                        <button class="copy-button" style="margin-top: 10px;" onclick="copySummary()">Copy Summary</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -308,6 +345,8 @@
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let recordingStartTime;
+        let recordingTimer;
 
         // File upload functionality
         fileUpload.addEventListener('click', () => audioFile.click());
@@ -384,7 +423,9 @@
         async function startRecording() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
                 audioChunks = [];
 
                 mediaRecorder.addEventListener('dataavailable', event => {
@@ -392,7 +433,7 @@
                 });
 
                 mediaRecorder.addEventListener('stop', () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                     const reader = new FileReader();
                     reader.onload = () => {
                         sendRecordedAudio(reader.result);
@@ -400,12 +441,22 @@
                     reader.readAsDataURL(audioBlob);
                 });
 
-                mediaRecorder.start();
+                // Start recording with 10-second chunks for better handling of long recordings
+                mediaRecorder.start(10000);
                 isRecording = true;
+                recordingStartTime = Date.now();
                 recordButton.classList.add('recording');
                 recordIcon.classList.add('recording');
                 recordText.textContent = 'Stop Recording';
                 showStatus('Recording... Click to stop.', 'loading');
+                
+                // Start recording timer
+                recordingTimer = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    showStatus(`Recording... ${minutes}:${seconds.toString().padStart(2, '0')} - Click to stop.`, 'loading');
+                }, 1000);
             } catch (error) {
                 showStatus('Error accessing microphone: ' + error.message, 'error');
             }
@@ -416,6 +467,13 @@
                 mediaRecorder.stop();
                 mediaRecorder.stream.getTracks().forEach(track => track.stop());
                 isRecording = false;
+                
+                // Clear recording timer
+                if (recordingTimer) {
+                    clearInterval(recordingTimer);
+                    recordingTimer = null;
+                }
+                
                 recordButton.classList.remove('recording');
                 recordIcon.classList.remove('recording');
                 recordText.textContent = 'Start Recording';
@@ -460,6 +518,59 @@
             transcriptMeta.textContent = metaText;
             
             transcript.classList.add('show');
+        }
+
+        function generateSummary(summaryType) {
+            const transcriptText = document.getElementById('transcriptText').textContent;
+            if (!transcriptText) {
+                showStatus('No transcript available for summarization.', 'error');
+                return;
+            }
+
+            // Disable all summary buttons
+            const summaryButtons = document.querySelectorAll('.summary-button');
+            summaryButtons.forEach(btn => btn.disabled = true);
+
+            showStatus(`Generating ${summaryType.replace('_', ' ')} summary...`, 'loading');
+
+            fetch('/summarize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    transcript: transcriptText,
+                    summary_type: summaryType
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('summaryText').textContent = data.summary;
+                    document.getElementById('summaryResult').style.display = 'block';
+                    showStatus(`${summaryType.replace('_', ' ')} summary generated successfully!`, 'success');
+                } else {
+                    showStatus(data.error || 'Summary generation failed.', 'error');
+                }
+            })
+            .catch(error => {
+                showStatus('Error: ' + error.message, 'error');
+            })
+            .finally(() => {
+                // Re-enable summary buttons
+                summaryButtons.forEach(btn => btn.disabled = false);
+            });
+        }
+
+        function copySummary() {
+            const summaryText = document.getElementById('summaryText').textContent;
+            navigator.clipboard.writeText(summaryText).then(() => {
+                const copyBtn = document.querySelector('#summaryResult .copy-button');
+                copyBtn.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyBtn.textContent = 'Copy Summary';
+                }, 2000);
+            });
         }
     </script>
 </body>
