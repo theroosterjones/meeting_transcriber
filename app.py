@@ -61,7 +61,7 @@ def convert_audio_to_wav(audio_file_path):
         print(f"Error converting audio: {e}")
         return audio_file_path
 
-def split_audio_into_chunks(audio_file_path, chunk_duration_minutes=10):
+def split_audio_into_chunks(audio_file_path, chunk_duration_minutes=5):
     """Split audio file into smaller chunks for processing"""
     try:
         audio = AudioSegment.from_file(audio_file_path)
@@ -71,7 +71,8 @@ def split_audio_into_chunks(audio_file_path, chunk_duration_minutes=10):
         for i in range(0, len(audio), chunk_duration_ms):
             chunk = audio[i:i + chunk_duration_ms]
             chunk_path = f"{audio_file_path.rsplit('.', 1)[0]}_chunk_{i//chunk_duration_ms}.wav"
-            chunk.export(chunk_path, format='wav')
+            # Export with lower quality to reduce file size
+            chunk.export(chunk_path, format='wav', parameters=["-ar", "16000", "-ac", "1"])
             chunks.append(chunk_path)
         
         return chunks
@@ -139,12 +140,20 @@ def transcribe_long_audio(audio_file_path):
         
         print(f"File is {file_size_mb:.1f} MB, splitting into chunks...")
         
-        # Split into 10-minute chunks (approximately 15-20MB each)
-        chunks = split_audio_into_chunks(audio_file_path, chunk_duration_minutes=10)
+        # Split into 5-minute chunks with reduced quality (approximately 5-10MB each)
+        chunks = split_audio_into_chunks(audio_file_path, chunk_duration_minutes=5)
         
         all_transcripts = []
         for i, chunk_path in enumerate(chunks):
             print(f"Processing chunk {i+1}/{len(chunks)}: {chunk_path}")
+            
+            # Check chunk size before processing
+            chunk_size = os.path.getsize(chunk_path) / (1024*1024)
+            print(f"Chunk size: {chunk_size:.1f} MB")
+            
+            if chunk_size > 25:
+                print(f"Chunk too large ({chunk_size:.1f} MB), skipping...")
+                continue
             
             # Transcribe chunk
             chunk_transcript = transcribe_with_openai(chunk_path)
