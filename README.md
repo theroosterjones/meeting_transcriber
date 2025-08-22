@@ -86,16 +86,39 @@ setup.bat
    - Get transcribed text results
    - Generate AI-powered summaries (Key Points, Executive, or Detailed)
 
-## Recent Updates (v2.0)
+## Version History
 
-### Major Improvements:
+### v2.2 (August 21, 2025) - Transcript Management & Performance Optimization
+#### Major Improvements:
+- **Dedicated Transcript Storage**: Created `transcripts/` directory for organized file management
+- **Performance Optimization**: Reduced chunking threshold from 25MB to 10MB for faster processing
+- **Smaller Chunks**: Changed from 5-minute to 3-minute chunks for improved processing speed
+- **Transcript API**: Added `/transcripts` and `/transcripts/<filename>` endpoints for file management
+- **File Information Display**: Web interface now shows transcript filename after processing
+- **Standalone Processing Script**: Added `process_recording.py` for processing interrupted recordings
+
+#### Technical Changes:
+- **Directory Structure**: Organized transcripts separate from audio uploads
+- **Chunking Optimization**: 3-minute chunks (~3-6MB each) for faster API processing
+- **File Naming**: Timestamped transcript files with descriptive names
+- **Error Recovery**: Standalone script for processing interrupted recordings
+- **Web Integration**: Enhanced UI to display transcript file information
+
+### v2.1 (August 2025) - Enhanced Processing
+#### Improvements:
+- **Better Progress Messaging**: Added time estimates for large file processing
+- **Improved Error Handling**: Enhanced error messages and file validation
+- **Processing Optimization**: Faster chunking and transcription pipeline
+
+### v2.0 (August 2025) - Long Audio Support & AI Summaries
+#### Major Improvements:
 - **Long Audio Support**: Now handles recordings over 1 hour by automatically splitting into manageable chunks
 - **AI Summaries**: Added three types of AI-generated summaries using GPT-3.5-turbo
 - **File Size Management**: Smart handling of large files with automatic chunking
 - **Better Error Handling**: Improved error messages and file size validation
 - **Enhanced UI**: Added summary generation buttons and improved user experience
 
-### Technical Changes:
+#### Technical Changes:
 - **Automatic Chunking**: Files over 25MB are split into 10-minute chunks for processing
 - **Summary API**: New `/summarize` endpoint for generating different types of summaries
 - **GPT Integration**: Added GPT-3.5-turbo for summary generation
@@ -135,14 +158,17 @@ The application uses environment variables for configuration. Copy `env_example.
 
 ```
 Meeting_Transcriber/
-├── app.py              # Main Flask application
-├── requirements.txt     # Python dependencies
-├── env_example.txt     # Environment variables template
-├── .env                # Environment variables (create from template)
-├── static/             # Static assets (CSS, JS, images)
-└── templates/          # HTML templates
-    ├── index.html      # Main application page
-    └── login.html      # Login page
+├── app.py                  # Main Flask application
+├── process_recording.py    # Standalone script for processing recordings
+├── requirements.txt        # Python dependencies
+├── env_example.txt        # Environment variables template
+├── .env                   # Environment variables (create from template)
+├── uploads/               # Temporary audio file storage
+├── transcripts/           # Organized transcript storage
+├── static/                # Static assets (CSS, JS, images)
+└── templates/             # HTML templates
+    ├── index.html         # Main application page
+    └── login.html         # Login page
 ```
 
 ## API Usage

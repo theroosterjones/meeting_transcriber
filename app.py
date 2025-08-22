@@ -29,10 +29,14 @@ client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 # Configure upload settings
 UPLOAD_FOLDER = 'uploads'
+TRANSCRIPTS_FOLDER = 'transcripts'
 ALLOWED_EXTENSIONS = {'wav', 'mp3', 'm4a', 'flac', 'ogg', 'webm', 'opus'}
 
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+if not os.path.exists(TRANSCRIPTS_FOLDER):
+    os.makedirs(TRANSCRIPTS_FOLDER)
 
 # Simple user credentials (in production, use a database and hashed passwords)
 USERS = {
@@ -100,6 +104,7 @@ def transcribe_with_openai(audio_file_path):
         
         with open(wav_path, 'rb') as audio_file:
             print("Sending to OpenAI Whisper API...")
+            print("This may take 1-3 minutes for large files...")
             transcript = client.audio.transcriptions.create(
                 model="whisper-1",
                 file=audio_file,
@@ -134,14 +139,14 @@ def transcribe_long_audio(audio_file_path):
         file_size = os.path.getsize(audio_file_path)
         file_size_mb = file_size / (1024*1024)
         
-        # If file is under 25MB, process normally
-        if file_size_mb <= 25:
+        # Chunk files larger than 10MB for faster processing
+        if file_size_mb <= 10:
             return transcribe_with_openai(audio_file_path)
         
-        print(f"File is {file_size_mb:.1f} MB, splitting into chunks...")
+        print(f"File is {file_size_mb:.1f} MB, splitting into chunks for faster processing...")
         
-        # Split into 5-minute chunks with reduced quality (approximately 5-10MB each)
-        chunks = split_audio_into_chunks(audio_file_path, chunk_duration_minutes=5)
+        # Split into 3-minute chunks for faster processing (approximately 3-6MB each)
+        chunks = split_audio_into_chunks(audio_file_path, chunk_duration_minutes=3)
         
         all_transcripts = []
         for i, chunk_path in enumerate(chunks):
@@ -298,13 +303,22 @@ def upload_file():
         transcript = transcribe_long_audio(file_path)
         
         if transcript:
+            # Save transcript to file
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            transcript_filename = f"transcript_{timestamp}_{filename}.txt"
+            transcript_path = os.path.join(TRANSCRIPTS_FOLDER, transcript_filename)
+            
+            with open(transcript_path, 'w', encoding='utf-8') as f:
+                f.write(transcript.text)
+            
             # Clean up temporary file
             os.remove(file_path)
             
             return jsonify({
                 'success': True,
                 'transcript': transcript.text,
-                'method': transcript.method
+                'method': transcript.method,
+                'transcript_file': transcript_filename
             })
         else:
             # Try Google as fallback
@@ -348,12 +362,21 @@ def record_audio():
         transcript = transcribe_long_audio(file_path)
         
         if transcript:
+            # Save transcript to file
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            transcript_filename = f"transcript_recorded_{timestamp}.txt"
+            transcript_path = os.path.join(TRANSCRIPTS_FOLDER, transcript_filename)
+            
+            with open(transcript_path, 'w', encoding='utf-8') as f:
+                f.write(transcript.text)
+            
             # Clean up
             os.remove(file_path)
             return jsonify({
                 'success': True,
                 'transcript': transcript.text,
-                'method': transcript.method
+                'method': transcript.method,
+                'transcript_file': transcript_filename
             })
         else:
             return jsonify({'error': 'Transcription failed'}), 500
@@ -369,6 +392,48 @@ def health_check():
         'openai_configured': bool(os.getenv('OPENAI_API_KEY')),
         'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/transcripts')
+@login_required
+def list_transcripts():
+    """List all available transcripts"""
+    try:
+        transcripts = []
+        if os.path.exists(TRANSCRIPTS_FOLDER):
+            for filename in os.listdir(TRANSCRIPTS_FOLDER):
+                if filename.endswith('.txt'):
+                    file_path = os.path.join(TRANSCRIPTS_FOLDER, filename)
+                    file_size = os.path.getsize(file_path)
+                    file_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                    transcripts.append({
+                        'filename': filename,
+                        'size': file_size,
+                        'size_mb': round(file_size / (1024*1024), 2),
+                        'created': file_time.strftime('%Y-%m-%d %H:%M:%S')
+                    })
+        
+        # Sort by creation time (newest first)
+        transcripts.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'transcripts': transcripts
+        })
+    except Exception as e:
+        return jsonify({'error': f'Error listing transcripts: {str(e)}'}), 500
+
+@app.route('/transcripts/<filename>')
+@login_required
+def download_transcript(filename):
+    """Download a specific transcript file"""
+    try:
+        file_path = os.path.join(TRANSCRIPTS_FOLDER, filename)
+        if os.path.exists(file_path):
+            return send_file(file_path, as_attachment=True, download_name=filename)
+        else:
+            return jsonify({'error': 'Transcript not found'}), 404
+    except Exception as e:
+        return jsonify({'error': f'Error downloading transcript: {str(e)}'}), 500
 
 @app.route('/summarize', methods=['POST'])
 @login_required

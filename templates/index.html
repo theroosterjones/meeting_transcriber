@@ -409,7 +409,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showTranscript(data.transcript, data.duration, data.method);
+                    showTranscript(data.transcript, data.duration, data.method, data.transcript_file);
                     showStatus('Transcription completed successfully!', 'success');
                 } else {
                     showStatus(data.error || 'Transcription failed.', 'error');
@@ -493,7 +493,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showTranscript(data.transcript, data.duration, data.method);
+                    showTranscript(data.transcript, data.duration, data.method, data.transcript_file);
                     showStatus('Recording transcribed successfully!', 'success');
                 } else {
                     showStatus(data.error || 'Transcription failed.', 'error');
@@ -509,12 +509,15 @@
             status.className = `status ${type}`;
         }
 
-        function showTranscript(text, duration, method) {
+        function showTranscript(text, duration, method, transcriptFile) {
             transcriptText.textContent = text;
             
             let metaText = `Method: ${method}`;
             if (duration) {
                 metaText += ` | Duration: ${Math.round(duration)}s`;
+            }
+            if (transcriptFile) {
+                metaText += ` | Saved as: ${transcriptFile}`;
             }
             transcriptMeta.textContent = metaText;
             
