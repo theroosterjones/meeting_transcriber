@@ -4,6 +4,10 @@
 # Uploads directory
 uploads/
 
+# Transcript files (keep directory structure)
+transcripts/*.txt
+transcripts/*.md
+
 # Python
 __pycache__/
 *.py[cod]
