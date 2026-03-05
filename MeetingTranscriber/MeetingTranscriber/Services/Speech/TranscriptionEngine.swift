@@ -3,6 +3,7 @@ import Combine
 
 protocol TranscriptionEngineProtocol: AnyObject {
     var segmentPublisher: AnyPublisher<TranscriptSegment, Never> { get }
+    var partialTextPublisher: AnyPublisher<String, Never> { get }
     var isRunning: Bool { get }
     func start() async throws
     func stop() -> [TranscriptSegment]
@@ -17,6 +18,7 @@ final class TranscriptionEngine: TranscriptionEngineProtocol {
     private let diarizationManager: SpeakerDiarizationManagerProtocol
 
     private let segmentSubject = PassthroughSubject<TranscriptSegment, Never>()
+    private let partialTextSubject = CurrentValueSubject<String, Never>("")
     private var cancellables = Set<AnyCancellable>()
 
     private var accumulatedSegments: [TranscriptSegment] = []
@@ -29,6 +31,10 @@ final class TranscriptionEngine: TranscriptionEngineProtocol {
 
     var segmentPublisher: AnyPublisher<TranscriptSegment, Never> {
         segmentSubject.eraseToAnyPublisher()
+    }
+
+    var partialTextPublisher: AnyPublisher<String, Never> {
+        partialTextSubject.eraseToAnyPublisher()
     }
 
     init(
@@ -113,9 +119,11 @@ final class TranscriptionEngine: TranscriptionEngineProtocol {
             accumulatedSegments.append(segment)
             segmentSubject.send(segment)
             pendingText = ""
+            partialTextSubject.send("")
             segmentStartTime = elapsed
         } else {
             pendingText = result.text
+            partialTextSubject.send(result.text)
         }
     }
 

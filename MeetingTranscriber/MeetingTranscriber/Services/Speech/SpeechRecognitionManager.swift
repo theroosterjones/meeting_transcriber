@@ -120,6 +120,9 @@ final class SpeechRecognitionManager: SpeechRecognitionManagerProtocol {
 
             if error != nil {
                 self.endRecognitionSession()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    try? self?.startRecognitionSession()
+                }
             }
         }
     }

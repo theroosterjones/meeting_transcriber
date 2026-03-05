@@ -101,6 +101,13 @@ final class MeetingRecorderViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
+        transcriptionEngine.partialTextPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] text in
+                self?.currentPartialText = text
+            }
+            .store(in: &cancellables)
+
         if let engine = transcriptionEngine as? TranscriptionEngine {
             if let audioMgr = Mirror(reflecting: engine).children
                 .first(where: { $0.label == "audioManager" })?.value as? AudioCaptureManagerProtocol {
