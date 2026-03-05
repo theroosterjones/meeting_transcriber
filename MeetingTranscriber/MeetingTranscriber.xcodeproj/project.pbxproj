@@ -31,6 +31,10 @@
 		A10022 /* TranscriptSegmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* TranscriptSegmentRow.swift */; };
 		A10023 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* SettingsView.swift */; };
 		A10024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10025 /* Assets.xcassets */; };
+		A10025 /* ConversationMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10026; };
+		A10026 /* ConversationAnalyticsEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10027; };
+		A10027 /* MeetingAnalyticsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10028; };
+		A10028 /* MeetingAnalyticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10029; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -60,6 +64,10 @@
 		B10024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C10001 /* MeetingTranscriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetingTranscriber.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10026 /* ConversationMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationMetrics.swift; sourceTree = "<group>"; };
+		B10027 /* ConversationAnalyticsEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationAnalyticsEngine.swift; sourceTree = "<group>"; };
+		B10028 /* MeetingAnalyticsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAnalyticsViewModel.swift; sourceTree = "<group>"; };
+		B10029 /* MeetingAnalyticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAnalyticsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -119,6 +127,7 @@
 				B10004 /* TranscriptSegment.swift */,
 				B10005 /* SpeakerProfile.swift */,
 				B10006 /* AppError.swift */,
+				B10026 /* ConversationMetrics.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -132,8 +141,17 @@
 				E10010 /* Summarization */,
 				E10015 /* Storage */,
 				E10016 /* Network */,
+				E10021 /* Analytics */,
 			);
 			path = Services;
+			sourceTree = "<group>";
+		};
+		E10021 /* Analytics */ = {
+			isa = PBXGroup;
+			children = (
+				B10027 /* ConversationAnalyticsEngine.swift */,
+			);
+			path = Analytics;
 			sourceTree = "<group>";
 		};
 		E10007 /* Audio */ = {
@@ -175,6 +193,7 @@
 				B10014 /* MeetingRecorderViewModel.swift */,
 				B10015 /* MeetingHistoryViewModel.swift */,
 				B10016 /* MeetingDetailViewModel.swift */,
+				B10028 /* MeetingAnalyticsViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -186,9 +205,18 @@
 				E10013 /* Recording */,
 				E10014 /* History */,
 				E10019 /* Detail */,
+				E10022 /* Analytics */,
 				E10020 /* Components */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		E10022 /* Analytics */ = {
+			isa = PBXGroup;
+			children = (
+				B10029 /* MeetingAnalyticsView.swift */,
+			);
+			path = Analytics;
 			sourceTree = "<group>";
 		};
 		E10013 /* Recording */ = {
@@ -349,6 +377,10 @@
 				A10021 /* SpeakerBadge.swift in Sources */,
 				A10022 /* TranscriptSegmentRow.swift in Sources */,
 				A10023 /* SettingsView.swift in Sources */,
+				A10025 /* ConversationMetrics.swift in Sources */,
+				A10026 /* ConversationAnalyticsEngine.swift in Sources */,
+				A10027 /* MeetingAnalyticsViewModel.swift in Sources */,
+				A10028 /* MeetingAnalyticsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

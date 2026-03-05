@@ -15,6 +15,7 @@ struct MeetingDetailView: View {
             Picker("View", selection: $selectedTab) {
                 Text("Transcript").tag(0)
                 Text("Summary").tag(1)
+                Text("Analytics").tag(2)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal)
@@ -23,6 +24,7 @@ struct MeetingDetailView: View {
             TabView(selection: $selectedTab) {
                 transcriptTab.tag(0)
                 summaryTab.tag(1)
+                MeetingAnalyticsView(meeting: viewModel.meeting).tag(2)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
