@@ -144,6 +144,16 @@ Meeting_Transcriber/
 
 ## Version History
 
+### v3.1 (March 2026) - Conversation Analytics & Live Transcript Fix
+- **Conversation Analytics Engine** — Phase 1 "Fitbit for Meetings":
+  - Total meeting duration, speaker count, speaker switch count
+  - Talk time per speaker (absolute + percentage)
+  - Speaking turns and longest monologue per speaker
+  - Silence gap detection (gaps > 3 seconds)
+  - New "Analytics" tab in meeting detail view with overview panel, talk-time bar chart, speaker detail list, and silence gaps panel
+- **Live transcript fix** — partial speech results now stream to the UI in real time (word-by-word as you speak), not just on finalized segments
+- **Speech recognition resilience** — recognition session auto-restarts after errors instead of waiting for the 55-second timer
+
 ### v3.0.1 (March 2026) - iOS App Verified & Tuned
 - **Build verified** — compiles clean on Xcode 26.2, zero errors/warnings
 - **Tested on device** — live transcription confirmed working on physical iPhone
