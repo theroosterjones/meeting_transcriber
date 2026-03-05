@@ -120,11 +120,14 @@ final class SpeakerDiarizationManager: SpeakerDiarizationManagerProtocol {
             }
         }
 
-        var splitComplex = DSPSplitComplex(realp: &realPart, imagp: &imagPart)
-        vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFTDirection(FFT_FORWARD))
-
         var magnitudes = [Float](repeating: 0, count: halfFFT)
-        vDSP_zvabs(&splitComplex, 1, &magnitudes, 1, vDSP_Length(halfFFT))
+        realPart.withUnsafeMutableBufferPointer { realBuf in
+            imagPart.withUnsafeMutableBufferPointer { imagBuf in
+                var splitComplex = DSPSplitComplex(realp: realBuf.baseAddress!, imagp: imagBuf.baseAddress!)
+                vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2n, FFTDirection(FFT_FORWARD))
+                vDSP_zvabs(&splitComplex, 1, &magnitudes, 1, vDSP_Length(halfFFT))
+            }
+        }
 
         // Spectral centroid
         var weightedSum: Float = 0
@@ -177,7 +180,7 @@ final class SpeakerDiarizationManager: SpeakerDiarizationManagerProtocol {
 
         // 7. MFCC-like features via log-mel + DCT (13 coefficients)
         let melBands = 13
-        var melEnergies = computeLogMelEnergies(magnitudes: magnitudes, numBands: melBands, sampleRate: sampleRate, fftSize: fftSize)
+        let melEnergies = computeLogMelEnergies(magnitudes: magnitudes, numBands: melBands, sampleRate: sampleRate, fftSize: fftSize)
 
         var dctResult = [Float](repeating: 0, count: melBands)
         for k in 0..<melBands {

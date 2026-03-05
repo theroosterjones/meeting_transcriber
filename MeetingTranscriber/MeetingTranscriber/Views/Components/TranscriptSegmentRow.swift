@@ -26,12 +26,11 @@ struct TranscriptSegmentRow: View {
 
                 Text(segment.text)
                     .font(.body)
-                    .foregroundStyle(isLatest ? .primary : .primary.opacity(0.85))
+                    .foregroundStyle(.primary.opacity(isLatest ? 1.0 : 0.85))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(.vertical, 4)
-        .padding(.leading, speakerAccentColor.opacity(0.12) != nil ? 0 : 0)
         .overlay(alignment: .leading) {
             Rectangle()
                 .fill(speakerAccentColor)

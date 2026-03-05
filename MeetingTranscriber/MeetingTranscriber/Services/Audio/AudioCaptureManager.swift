@@ -1,4 +1,5 @@
 import AVFoundation
+import Accelerate
 import Combine
 
 protocol AudioCaptureManagerProtocol: AnyObject {
@@ -59,7 +60,7 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
     private func configureAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setPreferredSampleRate(Self.sampleRate)
             try session.setPreferredIOBufferDuration(0.02)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
