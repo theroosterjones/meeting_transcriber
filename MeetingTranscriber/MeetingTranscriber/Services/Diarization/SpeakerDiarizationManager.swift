@@ -29,13 +29,18 @@ final class SpeakerDiarizationManager: SpeakerDiarizationManagerProtocol {
 
     private var previousEnergy: Float = 0
     private var framesSinceLastChange = 0
-    private let minFramesBetweenChanges = 15 // ~300ms at 50fps
+    private let minFramesBetweenChanges = 100 // ~2 seconds at ~50fps
+
+    // Require several consecutive frames to agree on a new speaker before switching.
+    private var candidateSpeaker: String?
+    private var candidateConfirmCount = 0
+    private let confirmationThreshold = 8
 
     var currentSpeakerPublisher: AnyPublisher<String, Never> {
         currentSpeakerSubject.eraseToAnyPublisher()
     }
 
-    init(maxSpeakers: Int = 8, similarityThreshold: Float = 0.82, silenceThreshold: Float = 0.005) {
+    init(maxSpeakers: Int = 8, similarityThreshold: Float = 0.92, silenceThreshold: Float = 0.005) {
         self.maxSpeakers = maxSpeakers
         self.similarityThreshold = similarityThreshold
         self.silenceThreshold = silenceThreshold
@@ -55,9 +60,23 @@ final class SpeakerDiarizationManager: SpeakerDiarizationManagerProtocol {
         framesSinceLastChange += 1
         previousEnergy = energy
 
-        if speaker != currentSpeakerSubject.value && framesSinceLastChange >= minFramesBetweenChanges {
-            framesSinceLastChange = 0
-            currentSpeakerSubject.send(speaker)
+        if speaker != currentSpeakerSubject.value {
+            if speaker == candidateSpeaker {
+                candidateConfirmCount += 1
+            } else {
+                candidateSpeaker = speaker
+                candidateConfirmCount = 1
+            }
+
+            if candidateConfirmCount >= confirmationThreshold && framesSinceLastChange >= minFramesBetweenChanges {
+                framesSinceLastChange = 0
+                candidateSpeaker = nil
+                candidateConfirmCount = 0
+                currentSpeakerSubject.send(speaker)
+            }
+        } else {
+            candidateSpeaker = nil
+            candidateConfirmCount = 0
         }
     }
 
@@ -65,6 +84,8 @@ final class SpeakerDiarizationManager: SpeakerDiarizationManagerProtocol {
         speakerProfiles.removeAll()
         previousEnergy = 0
         framesSinceLastChange = 0
+        candidateSpeaker = nil
+        candidateConfirmCount = 0
         currentSpeakerSubject.send("Speaker 1")
     }
 

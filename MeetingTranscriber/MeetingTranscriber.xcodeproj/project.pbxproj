@@ -7,34 +7,33 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10001 /* MeetingTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001; };
-		A10002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002; };
-		A10003 /* Meeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003; };
-		A10004 /* TranscriptSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004; };
-		A10005 /* SpeakerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005; };
-		A10006 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006; };
-		A10007 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007; };
-		A10008 /* SpeechRecognitionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008; };
-		A10009 /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009; };
-		A10010 /* SpeakerDiarizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010; };
-		A10011 /* SummarizationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011; };
-		A10012 /* FileStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012; };
-		A10013 /* APIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013; };
-		A10014 /* MeetingRecorderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10014; };
-		A10015 /* MeetingHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10015; };
-		A10016 /* MeetingDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10016; };
-		A10017 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017; };
-		A10018 /* MeetingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018; };
-		A10019 /* MeetingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019; };
-		A10020 /* AudioLevelIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10020; };
-		A10021 /* SpeakerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10021; };
-		A10022 /* TranscriptSegmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022; };
-		A10023 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023; };
-		A10024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10025; };
+		A10001 /* MeetingTranscriberApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001 /* MeetingTranscriberApp.swift */; };
+		A10002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002 /* ContentView.swift */; };
+		A10003 /* Meeting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10003 /* Meeting.swift */; };
+		A10004 /* TranscriptSegment.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10004 /* TranscriptSegment.swift */; };
+		A10005 /* SpeakerProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10005 /* SpeakerProfile.swift */; };
+		A10006 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10006 /* AppError.swift */; };
+		A10007 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10007 /* AudioCaptureManager.swift */; };
+		A10008 /* SpeechRecognitionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10008 /* SpeechRecognitionManager.swift */; };
+		A10009 /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10009 /* TranscriptionEngine.swift */; };
+		A10010 /* SpeakerDiarizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10010 /* SpeakerDiarizationManager.swift */; };
+		A10011 /* SummarizationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10011 /* SummarizationService.swift */; };
+		A10012 /* FileStorageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10012 /* FileStorageManager.swift */; };
+		A10013 /* APIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10013 /* APIConfiguration.swift */; };
+		A10014 /* MeetingRecorderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10014 /* MeetingRecorderViewModel.swift */; };
+		A10015 /* MeetingHistoryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10015 /* MeetingHistoryViewModel.swift */; };
+		A10016 /* MeetingDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10016 /* MeetingDetailViewModel.swift */; };
+		A10017 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10017 /* RecordingView.swift */; };
+		A10018 /* MeetingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10018 /* MeetingHistoryView.swift */; };
+		A10019 /* MeetingDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10019 /* MeetingDetailView.swift */; };
+		A10020 /* AudioLevelIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10020 /* AudioLevelIndicator.swift */; };
+		A10021 /* SpeakerBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10021 /* SpeakerBadge.swift */; };
+		A10022 /* TranscriptSegmentRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10022 /* TranscriptSegmentRow.swift */; };
+		A10023 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10023 /* SettingsView.swift */; };
+		A10024 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10025 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C10001 /* MeetingTranscriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetingTranscriber.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10001 /* MeetingTranscriberApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingTranscriberApp.swift; sourceTree = "<group>"; };
 		B10002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B10003 /* Meeting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Meeting.swift; sourceTree = "<group>"; };
@@ -60,6 +59,7 @@
 		B10023 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		B10024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B10025 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C10001 /* MeetingTranscriber.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MeetingTranscriber.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -262,7 +262,7 @@
 /* Begin PBXNativeTarget section */
 		F10001 /* MeetingTranscriber */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = G10003;
+			buildConfigurationList = G10003 /* Build configuration list for PBXNativeTarget "MeetingTranscriber" */;
 			buildPhases = (
 				F10002 /* Sources */,
 				D10001 /* Frameworks */,
@@ -292,7 +292,7 @@
 					};
 				};
 			};
-			buildConfigurationList = G10001;
+			buildConfigurationList = G10001 /* Build configuration list for PBXProject "MeetingTranscriber" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -479,7 +479,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YCKQ2HTCQ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MeetingTranscriber/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Meeting Transcriber";
@@ -509,7 +509,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = YCKQ2HTCQ3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MeetingTranscriber/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Meeting Transcriber";
