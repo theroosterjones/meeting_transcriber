@@ -45,6 +45,17 @@ venv.bak/
 *.swo
 *~
 
+# Xcode
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
 # OS
 .DS_Store
 .DS_Store?

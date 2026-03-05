@@ -144,6 +144,16 @@ Meeting_Transcriber/
 
 ## Version History
 
+### v3.0.1 (March 2026) - iOS App Verified & Tuned
+- **Build verified** — compiles clean on Xcode 26.2, zero errors/warnings
+- **Tested on device** — live transcription confirmed working on physical iPhone
+- **Speaker diarization tuned** — fixed false speaker splits (single speaker was being labeled as 3-4):
+  - Raised similarity threshold (0.82 → 0.92)
+  - Increased minimum gap between speaker changes (300ms → 2s)
+  - Added confirmation debouncing (8 consecutive frames must agree before switching)
+- **Asset catalog added** — AppIcon and AccentColor placeholders for App Store readiness
+- **Summarization** — not yet tested (requires OpenAI API key in Settings tab)
+
 ### v3.0 (March 2026) - Native iOS App
 - **Native iOS app** built with Swift + SwiftUI (MVVM architecture)
 - **On-device transcription** via Apple Speech framework (no server, no Whisper API needed)
