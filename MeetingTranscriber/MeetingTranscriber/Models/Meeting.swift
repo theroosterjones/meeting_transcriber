@@ -25,6 +25,10 @@ struct Meeting: Identifiable, Codable, Hashable {
         "summary_\(id.uuidString).txt"
     }
 
+    var audioFileName: String {
+        "audio_\(id.uuidString).caf"
+    }
+
     var formattedDuration: String {
         let hours = Int(duration) / 3600
         let minutes = (Int(duration) % 3600) / 60

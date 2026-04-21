@@ -35,6 +35,174 @@ protocol SummarizationServiceProtocol {
     func summarize(transcript: String, type: SummaryType) async throws -> String
 }
 
+final class LocalSummarizationService: SummarizationServiceProtocol {
+    private let stopWords: Set<String> = [
+        "a", "an", "and", "are", "as", "at", "be", "been", "being", "but", "by", "for", "from",
+        "had", "has", "have", "he", "her", "his", "i", "if", "in", "into", "is", "it", "its",
+        "me", "my", "of", "on", "or", "our", "she", "so", "that", "the", "their", "them", "they",
+        "this", "to", "was", "we", "were", "will", "with", "you", "your"
+    ]
+
+    private let actionKeywords: [String] = [
+        "action item", "next step", "follow up", "owner", "deadline", "by ", "will ", "todo"
+    ]
+
+    func summarize(transcript: String, type: SummaryType) async throws -> String {
+        let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleanedTranscript.isEmpty else { return "" }
+
+        let sentences = splitIntoSentences(cleanedTranscript)
+        guard !sentences.isEmpty else { return cleanedTranscript }
+
+        let ranked = rankSentences(sentences)
+        let actionItems = extractActionItems(from: sentences)
+
+        switch type {
+        case .keyPoints:
+            return buildKeyPointsSummary(from: ranked, actionItems: actionItems)
+        case .executive:
+            return buildExecutiveSummary(from: ranked, actionItems: actionItems)
+        case .detailed:
+            return buildDetailedSummary(from: ranked, actionItems: actionItems, transcript: cleanedTranscript)
+        }
+    }
+
+    private func splitIntoSentences(_ text: String) -> [String] {
+        text
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: { ".!?".contains($0) })
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count > 12 }
+    }
+
+    private func rankSentences(_ sentences: [String]) -> [String] {
+        var frequencies: [String: Int] = [:]
+        for sentence in sentences {
+            for token in tokenize(sentence) where !stopWords.contains(token) {
+                frequencies[token, default: 0] += 1
+            }
+        }
+
+        let scored = sentences.enumerated().map { index, sentence -> (Int, String, Int) in
+            let score = tokenize(sentence)
+                .filter { !stopWords.contains($0) }
+                .reduce(0) { $0 + frequencies[$1, default: 0] }
+            return (index, sentence, score)
+        }
+
+        let best = scored
+            .sorted { lhs, rhs in
+                if lhs.2 == rhs.2 { return lhs.0 < rhs.0 }
+                return lhs.2 > rhs.2
+            }
+            .prefix(min(12, max(4, sentences.count / 4)))
+            .sorted { $0.0 < $1.0 }
+            .map(\.1)
+
+        return best
+    }
+
+    private func extractActionItems(from sentences: [String]) -> [String] {
+        sentences.filter { sentence in
+            let lower = sentence.lowercased()
+            return actionKeywords.contains { lower.contains($0) }
+        }
+    }
+
+    private func buildKeyPointsSummary(from ranked: [String], actionItems: [String]) -> String {
+        var lines = ranked.prefix(6).map { "- \(normalizedSentence($0))" }
+        if lines.isEmpty {
+            lines = ["- No major discussion points were detected."]
+        }
+
+        if !actionItems.isEmpty {
+            lines.append("")
+            lines.append("Action Items:")
+            lines.append(contentsOf: formattedActionItems(actionItems.prefix(6).map { $0 }))
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private func buildExecutiveSummary(from ranked: [String], actionItems: [String]) -> String {
+        let core = ranked.prefix(4).joined(separator: ". ")
+        guard !core.isEmpty else { return "This meeting covered several discussion points and concluded with follow-up work." }
+
+        if let firstAction = actionItems.first {
+            return "\(normalizedSentence(core)). Primary follow-up: \(normalizedSentence(firstAction))"
+        }
+        return normalizedSentence(core)
+    }
+
+    private func buildDetailedSummary(from ranked: [String], actionItems: [String], transcript: String) -> String {
+        let speakerLabels: [String] = transcript
+            .split(separator: "\n")
+            .compactMap { line in
+                guard let range = line.range(of: ":") else { return nil }
+                return String(line[..<range.lowerBound]).trimmingCharacters(in: CharacterSet(charactersIn: "[]0123456789 "))
+            }
+            .filter { !$0.isEmpty }
+        let speakerCount = Set(speakerLabels).count
+
+        var sections: [String] = []
+        sections.append("Overview\n\(normalizedSentence(ranked.prefix(3).joined(separator: ". ")))")
+        sections.append("Discussion Points\n" + ranked.prefix(8).map { "- \(normalizedSentence($0))" }.joined(separator: "\n"))
+
+        if actionItems.isEmpty {
+            sections.append("Action Items\n- No explicit action items were detected.")
+        } else {
+            sections.append("Action Items\n" + formattedActionItems(actionItems.prefix(8).map { $0 }).joined(separator: "\n"))
+        }
+
+        sections.append("Meeting Signals\n- Estimated active speakers: \(max(1, speakerCount))")
+        return sections.joined(separator: "\n\n")
+    }
+
+    private func tokenize(_ text: String) -> [String] {
+        text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+    }
+
+    private func formattedActionItems(_ items: [String]) -> [String] {
+        items.enumerated().map { index, item in
+            let sentence = normalizedSentence(item)
+            let owner = extractOwner(from: sentence) ?? "Unassigned"
+            let dueDate = extractDueDate(from: sentence) ?? "Not specified"
+            return "- [\(index + 1)] \(sentence) (Owner: \(owner); Due: \(dueDate))"
+        }
+    }
+
+    private func extractOwner(from sentence: String) -> String? {
+        if let range = sentence.range(of: " will ", options: .caseInsensitive) {
+            let prefix = sentence[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+            guard !prefix.isEmpty else { return nil }
+            let parts = prefix.split(separator: " ")
+            return parts.suffix(min(2, parts.count)).joined(separator: " ")
+        }
+        return nil
+    }
+
+    private func extractDueDate(from sentence: String) -> String? {
+        let lowered = sentence.lowercased()
+        if let byRange = lowered.range(of: " by ") {
+            let suffix = sentence[byRange.upperBound...]
+            let tokens = suffix.split(separator: " ")
+            guard !tokens.isEmpty else { return nil }
+            return tokens.prefix(min(4, tokens.count)).joined(separator: " ")
+        }
+        return nil
+    }
+
+    private func normalizedSentence(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "" }
+        if let last = trimmed.last, ".!?".contains(last) {
+            return trimmed
+        }
+        return trimmed + "."
+    }
+}
+
 final class OpenAISummarizationService: SummarizationServiceProtocol {
     private let apiKey: String
     private let model: String

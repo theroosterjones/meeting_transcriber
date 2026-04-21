@@ -43,12 +43,6 @@ final class MeetingDetailViewModel: ObservableObject {
     }
 
     func generateSummary() {
-        guard apiConfiguration.isConfigured else {
-            error = .apiKeyMissing
-            showError = true
-            return
-        }
-
         guard !transcriptText.isEmpty else { return }
 
         isSummarizing = true
@@ -93,6 +87,21 @@ final class MeetingDetailViewModel: ObservableObject {
             showShareSheet = true
         } catch {
             self.error = .fileNotFound(meeting.summaryFileName)
+            showError = true
+        }
+    }
+
+    func shareMeetingReport() {
+        do {
+            let transcript = transcriptText.isEmpty ? (try storageManager.loadTranscript(for: meeting)) : transcriptText
+            let summary = summaryText.isEmpty ? nil : summaryText
+            shareURL = try storageManager.exportMeetingReport(for: meeting, transcript: transcript, summary: summary)
+            showShareSheet = true
+        } catch let appError as AppError {
+            error = appError
+            showError = true
+        } catch {
+            self.error = .fileWriteFailed(error)
             showError = true
         }
     }

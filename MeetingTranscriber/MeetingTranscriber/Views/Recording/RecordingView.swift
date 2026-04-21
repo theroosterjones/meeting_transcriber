@@ -5,6 +5,7 @@ struct RecordingView: View {
     @EnvironmentObject private var historyViewModel: MeetingHistoryViewModel
     @State private var navigateToMeeting: Meeting?
     @State private var showStopConfirmation = false
+    @State private var showAutoStopAlert = false
 
     var body: some View {
         NavigationStack {
@@ -20,9 +21,19 @@ struct RecordingView: View {
             .navigationTitle("Record")
             .navigationBarTitleDisplayMode(.inline)
             .alert("Error", isPresented: $viewModel.showError) {
+                if viewModel.isRecording {
+                    Button("Stop & Save") {
+                        stopAndSave()
+                    }
+                }
                 Button("OK") {}
             } message: {
                 Text(viewModel.error?.localizedDescription ?? "An unknown error occurred.")
+            }
+            .alert("Recording Finished", isPresented: $showAutoStopAlert) {
+                Button("OK") {}
+            } message: {
+                Text("The recording reached the 60-minute limit and was saved automatically.")
             }
             .confirmationDialog("Stop Recording?", isPresented: $showStopConfirmation) {
                 Button("Stop & Save", role: .destructive) {
@@ -31,6 +42,12 @@ struct RecordingView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This will finalize the transcript and save the meeting.")
+            }
+            .onChange(of: viewModel.autoStoppedMeeting) { _, meeting in
+                guard let meeting else { return }
+                historyViewModel.loadMeetings()
+                navigateToMeeting = meeting
+                showAutoStopAlert = true
             }
             .navigationDestination(item: $navigateToMeeting) { meeting in
                 MeetingDetailView(meeting: meeting)
@@ -57,6 +74,12 @@ struct RecordingView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+
+                Text("Tip: place the phone near the loudest laptop or speaker for better far-field capture.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
             }
 
             Spacer()
@@ -69,6 +92,9 @@ struct RecordingView: View {
     private var liveTranscriptionView: some View {
         VStack(spacing: 0) {
             recordingHeader
+            if let qualityMessage = viewModel.recordingQualityMessage {
+                qualityBanner(message: qualityMessage)
+            }
 
             Divider()
 
@@ -140,6 +166,20 @@ struct RecordingView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial)
+    }
+
+    private func qualityBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.orange)
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.orange.opacity(0.08))
     }
 
     @State private var pulsingOpacity: Double = 1.0

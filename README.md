@@ -3,25 +3,29 @@
 A meeting transcription and summarization system. This repository contains two implementations:
 
 1. **Python/Flask Web App** (original) — browser-based recording and transcription via OpenAI Whisper API
-2. **iOS App** (new, in `MeetingTranscriber/`) — native Swift/SwiftUI app with on-device transcription, real-time speaker diarization, and AI summarization
+2. **iOS App** (new, in `MeetingTranscriber/`) — native Swift/SwiftUI app with on-device transcription, real-time speaker diarization, and local-first summarization
 
 ---
 
 ## iOS App (`MeetingTranscriber/`)
 
-The native iOS version replaces the browser + server architecture with a standalone app that runs entirely on-device (except for optional AI summarization).
+The native iOS version replaces the browser + server architecture with a standalone app that runs entirely on-device by default, with optional cloud summarization mode if desired.
 
 **Key differences from the Python version:**
 - No server required — recording, transcription, and speaker detection all run on the iPhone
 - Real-time streaming transcription via Apple's Speech framework (on-device, offline-capable)
 - Speaker diarization (not present in the Python version) — detects and labels different speakers
-- Same 3 summary types (Key Points, Executive, Detailed) via OpenAI-compatible API called directly from the device
+- Local summarization mode enabled by default (no API key required)
+- Optional cloud summarization mode (OpenAI-compatible) remains available in Settings
+- 60-minute recording reliability features: auto-stop/save, checkpointed transcript segments, and recorded audio persistence
+- Live recording quality guidance for far-field meetings (low-input and low-confidence warnings)
+- Full meeting report export (summary + transcript) via share/mail sheet
 
 **Getting started:**
 1. Open `MeetingTranscriber/MeetingTranscriber.xcodeproj` in Xcode
 2. Set your development team in Signing & Capabilities
 3. Build to a physical iOS device (microphone + speech require real hardware)
-4. Add your OpenAI API key in the Settings tab for summarization
+4. (Optional) Switch to Cloud summarization in Settings and add your OpenAI-compatible API key
 
 For full architecture details, see [`MeetingTranscriber/ARCHITECTURE.md`](MeetingTranscriber/ARCHITECTURE.md).
 
@@ -144,6 +148,14 @@ Meeting_Transcriber/
 
 ## Version History
 
+### v3.2 (April 2026) - Local-First Summarization & Recording Hardening
+- **Local summarization default** — summaries now work on-device out of the box (no API key required)
+- **Optional cloud mode** — OpenAI-compatible summarization remains available via Settings
+- **Recording reliability** — 60-minute auto-stop/save, persisted session audio files, and periodic segment checkpointing
+- **Quality UX** — live warnings for low input level and low speech clarity during recording
+- **Confidence UX** — low-confidence transcript segments are visually flagged
+- **Export UX** — added single-file full meeting report export (summary + transcript) for easy email/share
+
 ### v3.1 (March 2026) - Conversation Analytics & Live Transcript Fix
 - **Conversation Analytics Engine** — Phase 1 "Fitbit for Meetings":
   - Total meeting duration, speaker count, speaker switch count
@@ -193,13 +205,14 @@ Meeting_Transcriber/
 
 ## API Key
 
-Both the Python and iOS apps require an OpenAI API key for summarization:
+The Python app requires an OpenAI API key.  
+The iOS app only requires an API key when Cloud summarization mode is selected.
 
 1. Visit [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Create an account or sign in
 3. Generate a new API key
 4. **Python**: Add to `.env` file
-5. **iOS**: Enter in the app's Settings tab
+5. **iOS (optional cloud mode)**: Enter in the app's Settings tab
 
 ## License
 

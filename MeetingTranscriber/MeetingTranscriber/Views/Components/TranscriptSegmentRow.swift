@@ -23,6 +23,11 @@ struct TranscriptSegmentRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 SpeakerBadge(label: segment.speakerLabel)
+                if segment.confidence < 0.45 {
+                    Label("Low confidence", systemImage: "exclamationmark.circle")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
 
                 Text(segment.text)
                     .font(.body)

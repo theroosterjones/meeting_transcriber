@@ -6,7 +6,7 @@ protocol AudioCaptureManagerProtocol: AnyObject {
     var audioBufferPublisher: AnyPublisher<AVAudioPCMBuffer, Never> { get }
     var audioLevelPublisher: AnyPublisher<Float, Never> { get }
     var isRecording: Bool { get }
-    func startCapture() async throws
+    func startCapture(recordingOutputURL: URL?) async throws
     func stopCapture()
 }
 
@@ -15,6 +15,8 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
     private let audioBufferSubject = PassthroughSubject<AVAudioPCMBuffer, Never>()
     private let audioLevelSubject = PassthroughSubject<Float, Never>()
     private var interruptionObserver: NSObjectProtocol?
+    private var routeChangeObserver: NSObjectProtocol?
+    private var recordingFile: AVAudioFile?
 
     private(set) var isRecording = false
 
@@ -29,10 +31,10 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
         audioLevelSubject.eraseToAnyPublisher()
     }
 
-    func startCapture() async throws {
+    func startCapture(recordingOutputURL: URL? = nil) async throws {
         try await requestMicrophonePermission()
         try configureAudioSession()
-        try installTapAndStart()
+        try installTapAndStart(recordingOutputURL: recordingOutputURL)
         registerForInterruptions()
         isRecording = true
     }
@@ -41,7 +43,9 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
         guard isRecording else { return }
         audioEngine.inputNode.removeTap(onBus: 0)
         audioEngine.stop()
+        recordingFile = nil
         teardownInterruptionObserver()
+        teardownRouteChangeObserver()
         deactivateAudioSession()
         isRecording = false
     }
@@ -60,9 +64,16 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
     private func configureAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            // Use .videoRecording to reduce aggressive voice-processing suppression and improve
+            // far-field capture (e.g. nearby laptop/phone speakers in hybrid meetings).
+            try session.setCategory(
+                .playAndRecord,
+                mode: .videoRecording,
+                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers]
+            )
             try session.setPreferredSampleRate(Self.sampleRate)
             try session.setPreferredIOBufferDuration(0.02)
+            try session.setPreferredInputNumberOfChannels(1)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             throw AppError.audioSessionSetupFailed(error)
@@ -73,7 +84,7 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func installTapAndStart() throws {
+    private func installTapAndStart(recordingOutputURL: URL?) throws {
         let inputNode = audioEngine.inputNode
         let hardwareFormat = inputNode.outputFormat(forBus: 0)
 
@@ -90,6 +101,22 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
         }
 
         let converter = AVAudioConverter(from: hardwareFormat, to: desiredFormat)
+        let writeFormat = converter?.outputFormat ?? hardwareFormat
+
+        if let recordingOutputURL {
+            do {
+                recordingFile = try AVAudioFile(
+                    forWriting: recordingOutputURL,
+                    settings: writeFormat.settings,
+                    commonFormat: writeFormat.commonFormat,
+                    interleaved: writeFormat.isInterleaved
+                )
+            } catch {
+                throw AppError.fileWriteFailed(error)
+            }
+        } else {
+            recordingFile = nil
+        }
 
         inputNode.installTap(onBus: 0, bufferSize: Self.bufferSize, format: hardwareFormat) { [weak self] buffer, _ in
             guard let self else { return }
@@ -111,10 +138,12 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
                 if status == .haveData {
                     self.audioBufferSubject.send(convertedBuffer)
                     self.publishAudioLevel(from: convertedBuffer)
+                    try? self.recordingFile?.write(from: convertedBuffer)
                 }
             } else {
                 self.audioBufferSubject.send(buffer)
                 self.publishAudioLevel(from: buffer)
+                try? self.recordingFile?.write(from: buffer)
             }
         }
 
@@ -146,12 +175,27 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
         ) { [weak self] notification in
             self?.handleInterruption(notification)
         }
+
+        routeChangeObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            self?.handleRouteChange(notification)
+        }
     }
 
     private func teardownInterruptionObserver() {
         if let observer = interruptionObserver {
             NotificationCenter.default.removeObserver(observer)
             interruptionObserver = nil
+        }
+    }
+
+    private func teardownRouteChangeObserver() {
+        if let observer = routeChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+            routeChangeObserver = nil
         }
     }
 
@@ -174,6 +218,26 @@ final class AudioCaptureManager: AudioCaptureManagerProtocol {
                 try? audioEngine.start()
             }
         @unknown default:
+            break
+        }
+    }
+
+    private func handleRouteChange(_ notification: Notification) {
+        guard isRecording else { return }
+        guard let userInfo = notification.userInfo,
+              let reasonValue = userInfo[AVAudioSessionRouteChangeReasonKey] as? UInt,
+              let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else {
+            return
+        }
+
+        switch reason {
+        case .oldDeviceUnavailable, .newDeviceAvailable, .categoryChange, .override:
+            // Keep long recordings resilient if route/device changes mid-session.
+            if !audioEngine.isRunning {
+                audioEngine.prepare()
+                try? audioEngine.start()
+            }
+        default:
             break
         }
     }

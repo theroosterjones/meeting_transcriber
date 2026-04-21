@@ -27,9 +27,9 @@
    │      │      │               │                  │
    ▼      ▼      ▼               ▼                  ▼
 ┌──────┐┌──────┐┌──────┐  ┌──────────┐     ┌──────────────┐
-│Audio ││Speech││Diari-│  │  File    │     │  OpenAI API  │
-│Captu-││Recog-││zation│  │ Storage  │     │  (or local)  │
-│re Mgr││n Mgr ││ Mgr  │  │ Manager  │     │              │
+│Audio ││Speech││Diari-│  │  File    │     │ Local Summ + │
+│Captu-││Recog-││zation│  │ Storage  │     │Optional Cloud│
+│re Mgr││n Mgr ││ Mgr  │  │ Manager  │     │    API       │
 └──┬───┘└──┬───┘└──┬───┘  └──────────┘     └──────────────┘
    │       │       │
    ▼       ▼       ▼
@@ -55,7 +55,8 @@ AudioCapture → SpeechRecognition → SpeakerDiarization into a unified Combine
 3. Speech results arrive as partial/final via Combine; diarization publishes speaker changes
 4. When a final speech result + speaker change align, a `TranscriptSegment` is emitted
 5. The ViewModel appends segments to the live list; SwiftUI re-renders
-6. On stop, segments are serialized to `.txt` and metadata to `.json` via `FileStorageManager`
+6. During recording, audio is persisted to a per-meeting `.caf` file and transcript checkpoints are periodically written
+7. On stop, transcript is serialized to `.txt` and metadata to `.json` via `FileStorageManager`
 
 ---
 
@@ -69,10 +70,12 @@ AudioCapture → SpeechRecognition → SpeakerDiarization into a unified Combine
 | Sample rate | 16 kHz | Standard for speech; saves memory over 44.1 kHz |
 | Format | Float32 mono | Required by both Speech framework and diarization DSP |
 | Buffer size | 1024 frames | ~64ms chunks; good balance of latency vs overhead |
-| Interruption handling | Pause/resume on AVAudioSession notifications | Required for phone calls, Siri, etc. |
+| Interruption/route handling | Pause/resume + route-change recovery | Keeps long sessions stable through calls, headset swaps, and output route changes |
 
-Key implementation detail: the hardware sample rate may differ from 16 kHz.
-An `AVAudioConverter` resamples in the tap callback before publishing.
+Key implementation details:
+- The hardware sample rate may differ from 16 kHz; an `AVAudioConverter` resamples in the tap callback before publishing.
+- Audio session uses `.videoRecording` mode with route options tuned for hybrid/far-field meetings (nearby laptop/phone speakers).
+- Each session writes a local `.caf` recording file while streaming buffers to ASR + diarization.
 
 ### 2.2 Speech Recognition Layer (`SpeechRecognitionManager`)
 
@@ -119,13 +122,14 @@ into the project, and replace `extractFeatures()` with model inference. The
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Default provider | OpenAI-compatible API | Best quality; user already has API key from Python version |
+| Default provider | Local summarization service | Zero API cost; works offline; strict local-first behavior |
 | Model | gpt-4o-mini | Good quality/cost ratio; fast |
-| Long transcript handling | Chunk into ~9K word segments, summarize each, then merge | Handles 1+ hour meetings |
-| Abstraction | Protocol (`SummarizationServiceProtocol`) | Swap to local LLM without UI changes |
+| Optional cloud provider | OpenAI-compatible API | Better quality for complex/very long transcripts when users opt in |
+| Long transcript handling | Local extractive pipeline + optional cloud chunking | Handles 1+ hour meetings in both modes |
+| Abstraction | Protocol (`SummarizationServiceProtocol`) | Swap providers without View/UI changes |
 | Summary types | Key Points, Executive, Detailed | Maps 1:1 from the Python app's 3 summary types |
 
-The `baseURL` is configurable, so any OpenAI-compatible endpoint works:
+Cloud mode is optional. When enabled, `baseURL` is configurable, so any OpenAI-compatible endpoint works:
 OpenRouter, Azure OpenAI, local llama.cpp server, Ollama, etc.
 
 ### 2.5 Storage Layer (`FileStorageManager`)
@@ -136,6 +140,7 @@ OpenRouter, Azure OpenAI, local llama.cpp server, Ollama, etc.
 | Metadata format | JSON (one file per meeting) | Structured; supports future schema evolution |
 | Transcript format | Plain text (.txt) | Matches Python version output; universally readable |
 | Directory structure | `Meetings/{uuid}/` + `Metadata/{uuid}.json` | Clean separation; easy to back up |
+| Session durability | `audio_{uuid}.caf` + `segments_{uuid}.json` checkpoints | Improves recovery for long/interrupt-prone sessions |
 
 ---
 
@@ -150,8 +155,8 @@ OpenRouter, Azure OpenAI, local llama.cpp server, Ollama, etc.
 **Key difference from Python:** The Python version records audio chunks in the browser
 (WebM/Opus), sends them to Flask as base64, converts to WAV with pydub, then sends to
 Whisper API. The iOS version eliminates all of this: AVAudioEngine provides PCM directly,
-and SFSpeechRecognizer transcribes in real-time on device. No audio file is ever created
-during recording.
+SFSpeechRecognizer transcribes in real-time on device, and audio is persisted locally
+per meeting for reliability and export.
 
 ### Phase 2: Speaker Diarization (Week 2)
 - [x] SpeakerDiarizationManager with spectral features
@@ -173,13 +178,14 @@ supports richer queries and future sync capabilities.
 
 ### Phase 4: Summarization (Week 3)
 - [x] SummarizationService protocol
-- [x] OpenAI implementation with chunking
+- [x] Local summarization implementation (default)
+- [x] Optional OpenAI-compatible cloud implementation
 - [x] Summary type picker (same 3 types as Python)
-- [x] API configuration UI
+- [x] Summarization mode + API configuration UI
 
-**Key difference from Python:** Python calls GPT-3.5-turbo from Flask. iOS calls
-gpt-4o-mini from the device directly. The chunking strategy is the same (split large
-transcripts, summarize parts, merge). No backend server needed.
+**Key difference from Python:** Python calls GPT-3.5-turbo from Flask. iOS now defaults
+to local summarization and can optionally call cloud APIs directly from device when users
+choose higher quality. No backend server needed.
 
 ### Phase 5: Polish + App Store (Week 4)
 - Add asset catalog with app icon
@@ -214,7 +220,7 @@ MeetingTranscriber/
     │   ├── Diarization/
     │   │   └── SpeakerDiarizationManager.swift   # Spectral feature clustering
     │   ├── Summarization/
-    │   │   └── SummarizationService.swift        # Protocol + OpenAI impl
+    │   │   └── SummarizationService.swift        # Protocol + Local default + optional cloud impl
     │   ├── Storage/
     │   │   └── FileStorageManager.swift          # Documents directory I/O
     │   └── Network/
@@ -261,20 +267,19 @@ For a v1.1 upgrade:
 
 ### 5.2 Best Summarization Approach
 
-**Recommendation: Cloud API (OpenAI-compatible) with configurable endpoint.**
+**Recommendation: Local-first default + optional cloud fallback.**
 
-On-device LLMs (e.g., Apple's foundation models in iOS 18.4+) are improving but cannot
-yet reliably summarize 10,000+ word transcripts with the quality GPT-4o-mini achieves.
-The configurable `baseURL` means users can point to:
+The app now ships with a local summarization pipeline as default to preserve offline use
+and avoid recurring API costs. For users who prefer higher semantic quality on long/complex
+transcripts, cloud mode remains optional with configurable endpoint support:
 
 - OpenAI directly
 - Azure OpenAI (for enterprise compliance)
 - A self-hosted Ollama/vLLM instance on their own hardware
 - Any OpenAI-compatible proxy
 
-When Apple ships on-device foundation model APIs with sufficient context windows,
-implement `SummarizationServiceProtocol` with an `AppleIntelligenceService` — zero
-UI or ViewModel changes required.
+As on-device foundation models improve, `SummarizationServiceProtocol` can be upgraded
+to higher-quality local models without changing View/UI layers.
 
 ### 5.3 Backend Necessity
 
@@ -285,10 +290,10 @@ UI or ViewModel changes required.
 | Flask server needed | No server |
 | Browser records, server transcribes | Device does both |
 | Whisper API via server | SFSpeechRecognizer on-device |
-| GPT via server proxy | Direct API call from device |
+| GPT via server proxy | Local default, optional direct API call from device |
 | Server stores files | Device stores files |
 
-The only network call the iOS app makes is the optional summarization API call,
+The only possible network call in the iOS app is optional cloud summarization,
 which goes directly from device to OpenAI. No intermediary server, no hosting costs,
 no scaling concerns.
 
@@ -304,12 +309,12 @@ no scaling concerns.
 | **Diarization** | Spectral features: works for 2-3 speakers. No pre-trained speaker models needed. |
 | **Summarization** | Apple Intelligence (iOS 18.4+): limited context window, not yet production-ready for long documents. |
 | **Privacy** | Maximum — zero data leaves device. |
-| **Offline** | Fully functional (except summarization). |
+| **Offline** | Fully functional including summarization (local mode). |
 | **Battery** | Excellent — no network I/O during recording. |
 | **Cost** | $0 per user per month. |
-| **Verdict** | **Ship this for recording + transcription. Not viable for summarization yet.** |
+| **Verdict** | **Now viable as default for v1: fully local, private, and free to run.** |
 
-### Option B: Hybrid (Chosen)
+### Option B: Hybrid (Optional)
 
 | Aspect | Assessment |
 |--------|------------|
@@ -320,7 +325,7 @@ no scaling concerns.
 | **Offline** | Recording + transcription work offline. Summary requires connection. |
 | **Battery** | Excellent during recording. One short network burst for summary. |
 | **Cost** | ~$0.01-0.05 per summary (GPT-4o-mini). User provides their own key. |
-| **Verdict** | **Best overall balance. Recommended for v1.0.** |
+| **Verdict** | **Useful opt-in mode for users who want higher-quality summaries.** |
 
 ### Option C: Cloud-First
 
@@ -341,16 +346,15 @@ no scaling concerns.
 | Criterion (weight) | On-Device | Hybrid | Cloud-First |
 |---------------------|-----------|--------|-------------|
 | Privacy (25%) | 10 | 8 | 3 |
-| Accuracy (20%) | 6 | 7 | 10 |
+| Accuracy (20%) | 7 | 9 | 10 |
 | Offline capability (15%) | 10 | 8 | 0 |
 | Battery efficiency (15%) | 10 | 9 | 4 |
-| Cost to user (15%) | 10 | 9 | 3 |
-| Implementation complexity (10%) | 7 | 7 | 4 |
-| **Weighted total** | **8.7** | **8.0** | **3.9** |
+| Cost to user (15%) | 10 | 8 | 3 |
+| Implementation complexity (10%) | 8 | 7 | 4 |
+| **Weighted total** | **9.0** | **8.2** | **4.1** |
 
-**The hybrid approach scores highest when privacy, offline, and battery are weighted
-appropriately for a mobile app.** The cloud-first approach only wins if accuracy is
-the sole criterion, which it rarely is for an App Store consumer product.
+**The local-first approach now scores highest for a free, privacy-first mobile app.**
+Hybrid remains a useful opt-in quality mode; cloud-first is still overkill for consumer v1.
 
 ---
 
@@ -362,7 +366,7 @@ the sole criterion, which it rarely is for an App Store consumer product.
 | Memory (long recordings) | Segments are lightweight structs (~200 bytes each); 1-hour meeting ≈ 2,000 segments ≈ 400KB |
 | Battery during recording | 16 kHz mono audio + on-device speech + lightweight DSP ≈ 5-8% battery per hour on iPhone 14+ |
 | App backgrounding | `UIBackgroundModes: audio` keeps recording alive; AVAudioSession interruption handler manages phone calls |
-| Large transcript summarization | Chunked into ~9K word segments; parallel API calls possible (serial by default to stay within rate limits) |
+| Large transcript summarization | Local extractive summarizer by default; optional cloud chunking for higher-quality long-form synthesis |
 | Storage | JSON metadata + text files; 1,000 meetings ≈ 50MB. No SQLite overhead. |
 
 ---

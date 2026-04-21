@@ -11,7 +11,9 @@ final class MeetingRecorderViewModel: ObservableObject {
     @Published var currentPartialText = ""
     @Published var currentSpeaker = "Speaker 1"
     @Published var audioLevel: Float = 0
+    @Published var recordingQualityMessage: String?
     @Published var elapsedTime: TimeInterval = 0
+    @Published var autoStoppedMeeting: Meeting?
     @Published var error: AppError?
     @Published var showError = false
 
@@ -21,6 +23,14 @@ final class MeetingRecorderViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var timerCancellable: AnyCancellable?
     private var recordingStartDate = Date()
+    private var activeMeetingID: UUID?
+    private let maximumRecordingDuration: TimeInterval = 60 * 60
+    private let checkpointSegmentInterval = 20
+    private let lowAudioThreshold: Float = 0.07
+    private let lowConfidenceThreshold: Float = 0.45
+    private let qualityWindowSize = 30
+    private var recentAudioLevels: [Float] = []
+    private var recentSegmentConfidences: [Float] = []
 
     init(
         transcriptionEngine: TranscriptionEngineProtocol? = nil,
@@ -35,12 +45,24 @@ final class MeetingRecorderViewModel: ObservableObject {
     func startRecording() {
         Task {
             do {
+                autoStoppedMeeting = nil
                 liveSegments.removeAll()
                 currentPartialText = ""
+                currentSpeaker = "Speaker 1"
+                audioLevel = 0
+                recordingQualityMessage = nil
+                recentAudioLevels.removeAll()
+                recentSegmentConfidences.removeAll()
                 recordingStartDate = Date()
+                let meetingID = UUID()
+                activeMeetingID = meetingID
 
+                try storageManager.prepareMeetingDirectory(for: meetingID)
+                let recordingURL = storageManager.audioRecordingURL(for: meetingID)
+
+                cancellables.removeAll()
                 bindEngine()
-                try await transcriptionEngine.start()
+                try await transcriptionEngine.start(recordingOutputURL: recordingURL)
 
                 isRecording = true
                 isPaused = false
@@ -48,9 +70,13 @@ final class MeetingRecorderViewModel: ObservableObject {
             } catch let appError as AppError {
                 self.error = appError
                 showError = true
+                activeMeetingID = nil
+                cancellables.removeAll()
             } catch {
                 self.error = .recordingFailed(error)
                 showError = true
+                activeMeetingID = nil
+                cancellables.removeAll()
             }
         }
     }
@@ -65,6 +91,7 @@ final class MeetingRecorderViewModel: ObservableObject {
         cancellables.removeAll()
 
         let meeting = Meeting(
+            id: activeMeetingID ?? UUID(),
             title: generateTitle(),
             createdAt: recordingStartDate,
             duration: elapsedTime,
@@ -75,6 +102,7 @@ final class MeetingRecorderViewModel: ObservableObject {
         do {
             try storageManager.saveMeeting(meeting)
             try storageManager.saveTranscript(meeting.fullTranscriptText, for: meeting)
+            try storageManager.saveTranscriptSegments(meeting.segments, for: meeting.id)
         } catch let appError as AppError {
             self.error = appError
             showError = true
@@ -86,6 +114,7 @@ final class MeetingRecorderViewModel: ObservableObject {
         liveSegments.removeAll()
         currentPartialText = ""
         elapsedTime = 0
+        activeMeetingID = nil
 
         return meeting
     }
@@ -96,8 +125,12 @@ final class MeetingRecorderViewModel: ObservableObject {
         transcriptionEngine.segmentPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] segment in
-                self?.liveSegments.append(segment)
-                self?.currentPartialText = ""
+                guard let self else { return }
+                self.liveSegments.append(segment)
+                self.currentPartialText = ""
+                self.recordRecentConfidence(segment.confidence)
+                self.evaluateRecordingQuality()
+                self.persistCheckpointIfNeeded()
             }
             .store(in: &cancellables)
 
@@ -108,27 +141,22 @@ final class MeetingRecorderViewModel: ObservableObject {
             }
             .store(in: &cancellables)
 
-        if let engine = transcriptionEngine as? TranscriptionEngine {
-            if let audioMgr = Mirror(reflecting: engine).children
-                .first(where: { $0.label == "audioManager" })?.value as? AudioCaptureManagerProtocol {
-                audioMgr.audioLevelPublisher
-                    .receive(on: DispatchQueue.main)
-                    .sink { [weak self] level in
-                        self?.audioLevel = level
-                    }
-                    .store(in: &cancellables)
+        transcriptionEngine.audioLevelPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in
+                guard let self else { return }
+                self.audioLevel = level
+                self.recordRecentAudioLevel(level)
+                self.evaluateRecordingQuality()
             }
+            .store(in: &cancellables)
 
-            if let diarizationMgr = Mirror(reflecting: engine).children
-                .first(where: { $0.label == "diarizationManager" })?.value as? SpeakerDiarizationManagerProtocol {
-                diarizationMgr.currentSpeakerPublisher
-                    .receive(on: DispatchQueue.main)
-                    .sink { [weak self] speaker in
-                        self?.currentSpeaker = speaker
-                    }
-                    .store(in: &cancellables)
+        transcriptionEngine.currentSpeakerPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] speaker in
+                self?.currentSpeaker = speaker
             }
-        }
+            .store(in: &cancellables)
     }
 
     private func startTimer() {
@@ -137,6 +165,10 @@ final class MeetingRecorderViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self, self.isRecording else { return }
                 self.elapsedTime = Date().timeIntervalSince(self.recordingStartDate)
+                if self.elapsedTime >= self.maximumRecordingDuration,
+                   let meeting = self.stopRecording() {
+                    self.autoStoppedMeeting = meeting
+                }
             }
     }
 
@@ -149,6 +181,56 @@ final class MeetingRecorderViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM d, yyyy 'at' h:mm a"
         return "Meeting — \(formatter.string(from: recordingStartDate))"
+    }
+
+    private func persistCheckpointIfNeeded() {
+        guard let meetingID = activeMeetingID else { return }
+        guard !liveSegments.isEmpty else { return }
+        guard liveSegments.count.isMultiple(of: checkpointSegmentInterval) else { return }
+
+        do {
+            try storageManager.saveTranscriptSegments(liveSegments, for: meetingID)
+        } catch let appError as AppError {
+            error = appError
+            showError = true
+        } catch let unexpectedError {
+            error = .fileWriteFailed(unexpectedError)
+            showError = true
+        }
+    }
+
+    private func recordRecentAudioLevel(_ level: Float) {
+        recentAudioLevels.append(level)
+        if recentAudioLevels.count > qualityWindowSize {
+            recentAudioLevels.removeFirst(recentAudioLevels.count - qualityWindowSize)
+        }
+    }
+
+    private func recordRecentConfidence(_ confidence: Float) {
+        recentSegmentConfidences.append(confidence)
+        if recentSegmentConfidences.count > qualityWindowSize {
+            recentSegmentConfidences.removeFirst(recentSegmentConfidences.count - qualityWindowSize)
+        }
+    }
+
+    private func evaluateRecordingQuality() {
+        guard isRecording else {
+            recordingQualityMessage = nil
+            return
+        }
+
+        let lowAudioRatio = recentAudioLevels.isEmpty ? 0 :
+            Float(recentAudioLevels.filter { $0 < lowAudioThreshold }.count) / Float(recentAudioLevels.count)
+        let lowConfidenceRatio = recentSegmentConfidences.isEmpty ? 0 :
+            Float(recentSegmentConfidences.filter { $0 < lowConfidenceThreshold }.count) / Float(recentSegmentConfidences.count)
+
+        if elapsedTime > 10, lowAudioRatio > 0.75 {
+            recordingQualityMessage = "Low input level. Move closer to speakers or increase meeting volume."
+        } else if recentSegmentConfidences.count >= 5, lowConfidenceRatio > 0.5 {
+            recordingQualityMessage = "Speech clarity is low. Reduce background noise or reposition the phone."
+        } else {
+            recordingQualityMessage = nil
+        }
     }
 
     var formattedElapsedTime: String {

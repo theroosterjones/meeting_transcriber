@@ -4,8 +4,10 @@ import Combine
 protocol TranscriptionEngineProtocol: AnyObject {
     var segmentPublisher: AnyPublisher<TranscriptSegment, Never> { get }
     var partialTextPublisher: AnyPublisher<String, Never> { get }
+    var audioLevelPublisher: AnyPublisher<Float, Never> { get }
+    var currentSpeakerPublisher: AnyPublisher<String, Never> { get }
     var isRunning: Bool { get }
-    func start() async throws
+    func start(recordingOutputURL: URL?) async throws
     func stop() -> [TranscriptSegment]
 }
 
@@ -37,6 +39,14 @@ final class TranscriptionEngine: TranscriptionEngineProtocol {
         partialTextSubject.eraseToAnyPublisher()
     }
 
+    var audioLevelPublisher: AnyPublisher<Float, Never> {
+        audioManager.audioLevelPublisher
+    }
+
+    var currentSpeakerPublisher: AnyPublisher<String, Never> {
+        diarizationManager.currentSpeakerPublisher
+    }
+
     init(
         audioManager: AudioCaptureManagerProtocol = AudioCaptureManager(),
         speechManager: SpeechRecognitionManagerProtocol = SpeechRecognitionManager(),
@@ -47,13 +57,17 @@ final class TranscriptionEngine: TranscriptionEngineProtocol {
         self.diarizationManager = diarizationManager
     }
 
-    func start() async throws {
+    func start(recordingOutputURL: URL? = nil) async throws {
         guard !isRunning else { return }
         accumulatedSegments.removeAll()
         diarizationManager.reset()
         recordingStartDate = Date()
+        currentSpeaker = "Speaker 1"
+        pendingText = ""
+        segmentStartTime = 0
+        partialTextSubject.send("")
 
-        try await audioManager.startCapture()
+        try await audioManager.startCapture(recordingOutputURL: recordingOutputURL)
         try await speechManager.startRecognition()
 
         bindPipeline()

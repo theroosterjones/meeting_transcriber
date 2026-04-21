@@ -34,6 +34,12 @@ struct MeetingDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        viewModel.shareMeetingReport()
+                    } label: {
+                        Label("Share Full Report", systemImage: "envelope")
+                    }
+
+                    Button {
                         viewModel.shareTranscript()
                     } label: {
                         Label("Share Transcript", systemImage: "square.and.arrow.up")
